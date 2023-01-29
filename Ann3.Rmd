@@ -1,0 +1,33 @@
+---
+title: "R Notebook"
+output: html_notebook
+editor_options: 
+  chunk_output_type: inline
+---
+```{r}
+library(dplyr)
+library(rvest)
+rm(list = ls())
+wikiLink <- "https://en.wikipedia.org/wiki/List_of_U.S._states_by_median_home_price"
+wikiPage <- read_html(wikiLink)
+```
+```{r}
+wikiPage %>% html_nodes("table") 
+```
+```{r}
+(homePriceData <- wikiPage %>% html_nodes("table") %>% .[2] %>% html_table() %>%.[[1]])
+```
+```{r}
+(names(homePriceData)=gsub(" ","",names(homePriceData))) #removing space from our data 
+```
+```{r}
+#gsub('-',NA,homePriceData$Staterank,fixed=TRUE)
+```
+```{r}
+homePriceData$Staterank <- NULL #removing Staterank column 
+```
+```{r}
+homePriceData
+```
+
+
