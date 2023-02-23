@@ -1,6 +1,158 @@
 ---
-title: "First Deliverable"
-output: html_notebook
-editor_options: 
-  chunk_output_type: inline
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+editor_options:
+  chunk_output_type: console
 ---
+
+CLEAR OBJECTS FROM WORKSPACE:
+
+```{r}
+rm(list = ls())
+```
+
+RETRIEVE DATA:
+
+```{r}
+library(rio)
+
+kc_full= read.csv("https://github.com/annks10/repo2/raw/main/KingCountyCSV_FullList.csv", stringsAsFactors = FALSE)
+```
+
+CLEAN DATA:
+
+```{r}
+#removing the first column X
+kc_full=kc_full[,-1,]
+
+#converting the label rows into columns 
+kc_full_wide= as.data.frame(t(kc_full))
+row.names(kc_full_wide)=NULL
+
+#removing unwanted columns 
+kc_full_wide=kc_full_wide[,-c(2,9,11:25,27:46,48:62,64:69,70:71)]
+colnames(kc_full_wide)=NULL
+
+#removing header from df
+colnames(kc_full_wide)=kc_full_wide[c(1),]
+
+#removing the first row
+kc_full_wide=kc_full_wide[-1,]
+#reset index
+row.names(kc_full_wide)=NULL
+
+
+#create a new column called label and population size to melt 
+kc_full_wide$Label="Population"
+colnames(kc_full_wide)
+
+set.seed(23)
+```
+
+RESHAPE DATA FOR GGPLOT:
+
+```{r}
+#library(reshape2)
+kc_full_long=reshape2::melt(kc_full_wide, c("Total:","Label"))
+kc_full_long
+
+#library(dplyr)
+#Syntax to drop columns using %in% operator
+kc_full_long=kc_full_long[ , !names(kc_full_long) %in% 
+    c("Total:","Label")]
+```
+
+ADD NEW ROW AT SPECIFIC INDEX POSITION TO DF
+
+```{r}
+#Add row using rbind()
+new_row = data.frame(variable = "Hispanic or Latino", value = "218,763")
+kc_full_long =  rbind( kc_full_long[1:2,], new_row, kc_full_long[-(1:2),] )
+#rownames(kc_full_long)= 1:nrow(kc_full_long)
+row.names(kc_full_long)=NULL
+```
+
+CONVERT VARIABLES INTO NUMERIC TYPE:
+
+```{r}
+kc_full_long$value=gsub(",","",kc_full_long$value,fixed = T)
+kc_full_long$percent=as.numeric(kc_full_long$value)
+kc_full_long$value=as.numeric(kc_full_long$value)
+str(kc_full_long)
+```
+
+CREATE PERCENT COLUMN:
+
+```{r}
+kc_full_long$percent=(kc_full_long$percent/sum(kc_full_long$percent)*100)
+kc_full_long$percent=format(round(kc_full_long$percent,2),nsmall = 2)
+kc_full_long$percent=as.numeric(kc_full_long$percent)
+str(kc_full_long)
+```
+
+PLOT
+
+```{r}
+library(ggplot2)
+
+kc_full_long %>%
+  arrange(variable) %>%    # First sort by val. This sort the dataframe but NOT the factor levels
+  mutate(variable=factor(variable, levels=variable)) %>%   # This trick update the factor levels
+  ggplot( aes(x=variable, y=percent)) +
+    geom_segment( aes(xend=variable, yend=0)) +
+    geom_point( size=4, color="orange") +
+    coord_flip() +
+    theme_bw() +
+    xlab("")
+```
+
+ADD TITLE
+
+```{r}
+titleText="King County Racial & Ethnic Population Size in 2020"
+sourceText="Source: US Census Bureau"
+LABEL=paste0(round(kc_full_long$percent,2),"%")
+```
+
+ORDERING BAR
+
+```{r}
+kc_full_long$variable= factor(kc_full_long$variable, levels = kc_full_long$variable[order(kc_full_long$percent, decreasing = FALSE)])
+```
+
+REDO PLOT
+
+```{r}
+library(ggplot2)
+library(scales)
+
+base=ggplot(data=kc_full_long,
+            aes(x=variable, y=percent))
+base
+
+plot1=base+geom_segment( aes(xend=variable, yend=0)) 
+plot1
+
+plot2=plot1+geom_point( size=4, color="orange") +
+  labs(title=titleText,
+       x=NULL,
+       y=NULL,
+       caption = sourceText)
+plot2
+plot3=plot2+scale_y_continuous(breaks=c(0,10,20,30,40,50,60),
+                     limits=c(0,60),
+                     labels = unit_format(suffix = ""))
+plot3
+plot4=plot3+coord_flip()
+plot5=plot4+theme_bw() 
+plot6=plot5+theme(plot.caption=element_text(hjust=0),
+                  plot.title=element_text(hjust=0.4))
+
+plot7=plot6+geom_text(hjust=0,
+                      size=3,
+                      aes(y=percent,
+                          label=LABEL))#+coord_flip()
+plot7
+```
